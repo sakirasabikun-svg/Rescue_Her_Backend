@@ -342,7 +342,7 @@ const db = mysql.createPool({
 }).promise();
 
 // ==========================================
-// 🚀 AUTOMATIC TABLE CREATION MATRIX (SECURED)
+// 🚀 AUTOMATIC TABLE CREATION MATRIX (BACKGROUND)
 // ==========================================
 async function initializeDatabase() {
   try {
@@ -402,18 +402,17 @@ async function initializeDatabase() {
   }
 }
 
-// রুট পেজে হিট করলেই টেবিল চেক হবে
-app.get('/', async (req, res) => {
-  await initializeDatabase();
-  res.send('🛡️ RescueHer Central MySQL Backend API is running smoothly...');
+// ব্যাকগ্রাউন্ডে টেবিল ক্রিয়েশন রান হবে, এপিআই রিকোয়েস্ট ব্লক করবে না
+initializeDatabase().catch(err => console.error("DB Init background error:", err));
+
+app.get('/', (req, res) => {
+  res.send('🛡️ Central Central MySQL Backend API is running smoothly...');
 });
 
 // ==========================================
 // 🔐 USER AUTHENTICATION API ENDPOINTS
 // ==========================================
 app.post('/api/signup', async (req, res) => {
-  await initializeDatabase(); // 👈 সার্ভারলেস এনভায়রনমেন্টে সেফটির জন্য রিকোয়েস্টের শুরুতে রান হবে
-  
   const { name, phone, bloodGroup, email, password } = req.body;
   if (!name || !phone || !bloodGroup || !email || !password) {
     return res.status(400).json({ success: false, message: "All fields are required!" });
@@ -439,8 +438,6 @@ app.post('/api/signup', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  await initializeDatabase(); // 👈 সেফটি চেক
-  
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ success: false, message: "Please provide email and password!" });
@@ -590,8 +587,7 @@ app.post('/api/sos/trigger', async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing required SOS fields!" });
   }
 
-  // 🛠️ ম্যাপের লিংক টাইপো ফিক্স করা হলো (0{latitude} সরানো হয়েছে) 🚀
-  const googleMapLink = `http://maps.google.com/?q=${latitude},${longitude}`;
+  const googleMapLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
   const currentArea = area || "Unknown Location";
 
   try {
