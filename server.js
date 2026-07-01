@@ -361,7 +361,7 @@ async function initializeDatabase() {
       )
     `);
 
-    // ২. Incident Reports Table (সিকিউরিটি ফিক্সড)
+    // ২. Incident Reports Table
     await db.query(`
       CREATE TABLE IF NOT EXISTS incident_reports (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -373,7 +373,7 @@ async function initializeDatabase() {
       )
     `);
 
-    // ৩. Emergency Contacts Table (সিকিউরিটি ফিক্সড - user_id যুক্ত করা হলো 🔒)
+    // ৩. Emergency Contacts Table
     await db.query(`
       CREATE TABLE IF NOT EXISTS contacts (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -402,9 +402,9 @@ async function initializeDatabase() {
   }
 }
 
-initializeDatabase();
-
-app.get('/', (req, res) => {
+// রুট পেজে হিট করলেই টেবিল চেক হবে
+app.get('/', async (req, res) => {
+  await initializeDatabase();
   res.send('🛡️ RescueHer Central MySQL Backend API is running smoothly...');
 });
 
@@ -412,6 +412,8 @@ app.get('/', (req, res) => {
 // 🔐 USER AUTHENTICATION API ENDPOINTS
 // ==========================================
 app.post('/api/signup', async (req, res) => {
+  await initializeDatabase(); // 👈 সার্ভারলেস এনভায়রনমেন্টে সেফটির জন্য রিকোয়েস্টের শুরুতে রান হবে
+  
   const { name, phone, bloodGroup, email, password } = req.body;
   if (!name || !phone || !bloodGroup || !email || !password) {
     return res.status(400).json({ success: false, message: "All fields are required!" });
@@ -431,11 +433,14 @@ app.post('/api/signup', async (req, res) => {
     const token = jwt.sign({ id: userId, email: email }, JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ success: true, token, user: { id: userId, name, email } });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Internal Server Error during signup" });
+    console.error("Signup Error Details:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error during signup", error: err.message });
   }
 });
 
 app.post('/api/login', async (req, res) => {
+  await initializeDatabase(); // 👈 সেফটি চেক
+  
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ success: false, message: "Please provide email and password!" });
@@ -466,7 +471,6 @@ app.get('/api/reports', async (req, res) => {
     return res.status(400).json({ success: false, message: "User ID is required to fetch reports!" });
   }
   try {
-    // শুধুমাত্র লগইন করা ইউজারের নিজস্ব রিপোর্টগুলো আসবে
     const [rows] = await db.query('SELECT * FROM incident_reports WHERE user_id = ? ORDER BY id DESC', [userId]);
     res.status(200).json(rows);
   } catch (err) {
@@ -501,7 +505,6 @@ app.get('/api/contacts', async (req, res) => {
     return res.status(400).json({ success: false, message: "User ID is required!" });
   }
   try {
-    // শুধুমাত্র নির্দিষ্ট ইউজারের কন্টাক্ট ডাটাবেজ থেকে ফিল্টার করে আনা হচ্ছে
     const [rows] = await db.query('SELECT * FROM contacts WHERE user_id = ? ORDER BY id DESC', [userId]);
     res.status(200).json(rows);
   } catch (err) {
@@ -519,7 +522,6 @@ app.post('/api/contacts', async (req, res) => {
       'INSERT INTO contacts (user_id, name, role, phone, email) VALUES (?, ?, ?, ?, ?)', 
       [userId, name, role, phone, email]
     );
-    // সেভ করার পর সাথে সাথে ওই ইউজারের আপডেট হওয়া কন্টাক্ট লিস্ট পাঠানো হচ্ছে
     const [allContacts] = await db.query('SELECT * FROM contacts WHERE user_id = ? ORDER BY id DESC', [userId]);
     res.status(201).json({ success: true, data: allContacts });
   } catch (err) {
@@ -529,7 +531,7 @@ app.post('/api/contacts', async (req, res) => {
 
 app.delete('/api/contacts/:id', async (req, res) => {
   const { id } = req.params;
-  const { userId } = req.query; // ডিলিট করার পর কারেন্ট লিস্ট রিফ্রেশের জন্য
+  const { userId } = req.query; 
   if (!userId) {
     return res.status(400).json({ success: false, message: "User ID is required" });
   }
@@ -588,12 +590,11 @@ app.post('/api/sos/trigger', async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing required SOS fields!" });
   }
 
-  // 🛠️ ম্যাপের লিংক জেনারেশন ১০০% পারফেক্ট গুগল ম্যাপস স্ট্যান্ডার্ডে ফিক্স করা হলো 🚀
-  const googleMapLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+  // 🛠️ ম্যাপের লিংক টাইপো ফিক্স করা হলো (0{latitude} সরানো হয়েছে) 🚀
+  const googleMapLink = `http://maps.google.com/?q=${latitude},${longitude}`;
   const currentArea = area || "Unknown Location";
 
   try {
-    // শুধুমাত্র যে SOS ট্রিগার করেছে, তার নিজস্ব সেভ করা কন্টাক্টদের কাছেই মেইল যাবে
     const [contacts] = await db.query('SELECT email FROM contacts WHERE user_id = ? AND email IS NOT NULL AND email != ""', [userId]);
     if (contacts.length === 0) {
       return res.status(400).json({ success: false, message: "No emergency contacts found for this account!" });
