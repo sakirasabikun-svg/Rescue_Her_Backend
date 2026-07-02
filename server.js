@@ -1,6 +1,5 @@
-
 // // server.js
-// require('dotenv').config(); // 👈 এটি .env ফাইল থেকে সব সিক্রেট লোড করবে
+// require('dotenv').config(); 
 
 // const express = require('express');
 // const cors = require('cors');
@@ -8,6 +7,7 @@
 // const bcrypt = require('bcryptjs'); 
 // const jwt = require('jsonwebtoken'); 
 // const nodemailer = require('nodemailer'); 
+// const fs = require('fs'); // 📄 ca.pem ফাইল রিড করার জন্য কোর মডিউল যোগ করা হলো
 
 // const app = express();
 // const PORT = process.env.PORT || 5000;
@@ -16,44 +16,47 @@
 // app.use(cors());
 // app.use(express.json());
 
-// // 🛢️ MySQL Database Connection Pool
+// // 🛢️ MySQL Database Connection Pool (Aiven Cloud MySQL এর সাথে সিকিউরড কানেক্ট করা হলো ☁️)
 // const db = mysql.createPool({
-//   host: process.env.DB_HOST,
-//   user: process.env.DB_USER,
-//   password: process.env.DB_PASSWORD, 
-//   database: process.env.DB_NAME,
-//   port: process.env.DB_PORT || 22842,
-//   ssl: {
-//     rejectUnauthorized: false 
-//   },
+//   host: process.env.DB_HOST || 'localhost', 
+//   user: process.env.DB_USER || 'root',                                                                        
+//   password: process.env.DB_PASSWORD || '',                        
+//   database: process.env.DB_NAME || 'rescueher_db', 
+//   port: process.env.DB_PORT || 3306, // 🔌 অনলাইন ক্লাউড পোর্টের জন্য এটি যোগ করা হলো
 //   waitForConnections: true,
 //   connectionLimit: 10,
-//   queueLimit: 0
+//   queueLimit: 0,
+//   // 🔒 SSL সার্টিফিকেট ভ্যালিডেশন (Aiven.io ক্লাউড ডাটাবেজের জন্য বাধ্যতামূলক)
+//   ssl: {
+//     rejectUnauthorized: false
+//   }
 // }).promise();
 
 // // ==========================================
-// // 🚀 AUTOMATIC TABLE CREATION MATRIX
+// // 🚀 AUTOMATIC TABLE CREATION MATRIX (BACKGROUND)
 // // ==========================================
 // async function initializeDatabase() {
 //   try {
-//     console.log("⏳ Checking & Preparing Online Database Tables...");
+//     console.log("⏳ Checking & Preparing Local Database Tables...");
 
+//     // ১. Users Table (blood_group ফিল্ডটিকে NOT NULL থেকে সরিয়ে NULL বা অপশনাল করা হলো)
 //     await db.query(`
 //       CREATE TABLE IF NOT EXISTS users (
 //         id INT AUTO_INCREMENT PRIMARY KEY,
 //         name VARCHAR(255) NOT NULL,
 //         phone VARCHAR(50) NOT NULL,
-//         blood_group VARCHAR(10) NOT NULL,
+//         blood_group VARCHAR(10) NULL, 
 //         email VARCHAR(255) NOT NULL UNIQUE,
 //         password VARCHAR(255) NOT NULL,
 //         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 //       )
 //     `);
 
+//     // ২. Incident Reports Table
 //     await db.query(`
 //       CREATE TABLE IF NOT EXISTS incident_reports (
 //         id INT AUTO_INCREMENT PRIMARY KEY,
-//         user_id INT NULL,
+//         user_id INT NOT NULL,
 //         location VARCHAR(255) NOT NULL,
 //         severity VARCHAR(50) NOT NULL,
 //         description TEXT,
@@ -61,9 +64,11 @@
 //       )
 //     `);
 
+//     // ③. Emergency Contacts Table
 //     await db.query(`
 //       CREATE TABLE IF NOT EXISTS contacts (
 //         id INT AUTO_INCREMENT PRIMARY KEY,
+//         user_id INT NOT NULL,
 //         name VARCHAR(255) NOT NULL,
 //         role VARCHAR(255) NOT NULL,
 //         phone VARCHAR(50) NOT NULL,
@@ -71,6 +76,7 @@
 //       )
 //     `);
 
+//     // ৪. Live Location Table
 //     await db.query(`
 //       CREATE TABLE IF NOT EXISTS live_location (
 //         id INT PRIMARY KEY,
@@ -81,24 +87,25 @@
 //       )
 //     `);
 
-//     console.log("✅ All Database Tables Verified & Ready for Action!");
+//     console.log("✅ All Local Database Tables Verified & Ready for Action!");
 //   } catch (err) {
 //     console.error("❌ Database Initialization Error:", err.message);
 //   }
 // }
 
-// initializeDatabase();
+// // ব্যাকগ্রাউন্ডে টেবিল ক্রিয়েশন রান হবে, এপিআই রিকোয়েস্ট ব্লক করবে না
+// initializeDatabase().catch(err => console.error("DB Init background error:", err));
 
 // app.get('/', (req, res) => {
-//   res.send('🛡️ RescueHer Central MySQL Backend API is running smoothly...');
+//   res.send('Central Central MySQL Backend API is running smoothly...');
 // });
 
 // // ==========================================
 // // 🔐 USER AUTHENTICATION API ENDPOINTS
 // // ==========================================
 // app.post('/api/signup', async (req, res) => {
-//   const { name, phone, bloodGroup, email, password } = req.body;
-//   if (!name || !phone || !bloodGroup || !email || !password) {
+//   const { name, phone, email, password } = req.body;
+//   if (!name || !phone || !email || !password) {
 //     return res.status(400).json({ success: false, message: "All fields are required!" });
 //   }
 //   try {
@@ -108,15 +115,17 @@
 //     }
 //     const salt = await bcrypt.genSalt(10);
 //     const hashedPassword = await bcrypt.hash(password, salt);
+    
 //     const [result] = await db.query(
-//       'INSERT INTO users (name, phone, blood_group, email, password) VALUES (?, ?, ?, ?, ?)',
-//       [name, phone, bloodGroup, email, hashedPassword]
+//       'INSERT INTO users (name, phone, email, password, blood_group) VALUES (?, ?, ?, ?, NULL)',
+//       [name, phone, email, hashedPassword]
 //     );
 //     const userId = result.insertId;
 //     const token = jwt.sign({ id: userId, email: email }, JWT_SECRET, { expiresIn: '7d' });
 //     res.status(201).json({ success: true, token, user: { id: userId, name, email } });
 //   } catch (err) {
-//     res.status(500).json({ success: false, message: "Internal Server Error during signup" });
+//     console.error("Signup Error Details:", err.message);
+//     res.status(500).json({ success: false, message: "Internal Server Error during signup", error: err.message });
 //   }
 // });
 
@@ -143,17 +152,15 @@
 // });
 
 // // ==========================================
-// // 📝 INCIDENT / ALERT HISTORY API ENDPOINTS
+// // 📝 INCIDENT / ALERT HISTORY API ENDPOINTS (🔒 SECURED)
 // // ==========================================
 // app.get('/api/reports', async (req, res) => {
 //   const { userId } = req.query;
+//   if (!userId) {
+//     return res.status(400).json({ success: false, message: "User ID is required to fetch reports!" });
+//   }
 //   try {
-//     let rows;
-//     if (userId) {
-//       [rows] = await db.query('SELECT * FROM incident_reports WHERE user_id = ? ORDER BY id DESC', [userId]);
-//     } else {
-//       [rows] = await db.query('SELECT * FROM incident_reports WHERE user_id IS NULL ORDER BY id DESC');
-//     }
+//     const [rows] = await db.query('SELECT * FROM incident_reports WHERE user_id = ? ORDER BY id DESC', [userId]);
 //     res.status(200).json(rows);
 //   } catch (err) {
 //     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -162,7 +169,7 @@
 
 // app.post('/api/report', async (req, res) => {
 //   const { userId, location, severity, description } = req.body;
-//   if (!location || !severity) {
+//   if (!userId || !location || !severity) {
 //     return res.status(400).json({ success: false, message: "Required fields are missing!" });
 //   }
 //   const timestamp = new Date().toLocaleString();
@@ -170,7 +177,7 @@
 //   try {
 //     const [result] = await db.query(
 //       'INSERT INTO incident_reports (user_id, location, severity, description, timestamp) VALUES (?, ?, ?, ?, ?)',
-//       [userId || null, location, severity, descLog, timestamp]
+//       [userId, location, severity, descLog, timestamp]
 //     );
 //     res.status(201).json({ success: true, message: "Incident saved!", data: { id: result.insertId } });
 //   } catch (err) {
@@ -179,11 +186,15 @@
 // });
 
 // // ==========================================
-// // 👥 EMERGENCY CONTACTS API ENDPOINTS
+// // 👥 EMERGENCY CONTACTS API ENDPOINTS (🔒 SECURED)
 // // ==========================================
 // app.get('/api/contacts', async (req, res) => {
+//   const { userId } = req.query;
+//   if (!userId) {
+//     return res.status(400).json({ success: false, message: "User ID is required!" });
+//   }
 //   try {
-//     const [rows] = await db.query('SELECT * FROM contacts ORDER BY id DESC');
+//     const [rows] = await db.query('SELECT * FROM contacts WHERE user_id = ? ORDER BY id DESC', [userId]);
 //     res.status(200).json(rows);
 //   } catch (err) {
 //     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -191,13 +202,16 @@
 // });
 
 // app.post('/api/contacts', async (req, res) => {
-//   const { name, role, phone, email } = req.body;
-//   if (!name || !role || !phone || !email) {
-//     return res.status(400).json({ success: false, message: "All fields are required" });
+//   const { userId, name, role, phone, email } = req.body;
+//   if (!userId || !name || !role || !phone || !email) {
+//     return res.status(400).json({ success: false, message: "All fields including User ID are required" });
 //   }
 //   try {
-//     await db.query('INSERT INTO contacts (name, role, phone, email) VALUES (?, ?, ?, ?)', [name, role, phone, email]);
-//     const [allContacts] = await db.query('SELECT * FROM contacts ORDER BY id DESC');
+//     await db.query(
+//       'INSERT INTO contacts (user_id, name, role, phone, email) VALUES (?, ?, ?, ?, ?)', 
+//       [userId, name, role, phone, email]
+//     );
+//     const [allContacts] = await db.query('SELECT * FROM contacts WHERE user_id = ? ORDER BY id DESC', [userId]);
 //     res.status(201).json({ success: true, data: allContacts });
 //   } catch (err) {
 //     res.status(500).json({ success: false, message: "Failed to save contact" });
@@ -206,9 +220,13 @@
 
 // app.delete('/api/contacts/:id', async (req, res) => {
 //   const { id } = req.params;
+//   const { userId } = req.query; 
+//   if (!userId) {
+//     return res.status(400).json({ success: false, message: "User ID is required" });
+//   }
 //   try {
-//     await db.query('DELETE FROM contacts WHERE id = ?', [id]);
-//     const [allContacts] = await db.query('SELECT * FROM contacts ORDER BY id DESC');
+//     await db.query('DELETE FROM contacts WHERE id = ? AND user_id = ?', [id, userId]);
+//     const [allContacts] = await db.query('SELECT * FROM contacts WHERE user_id = ? ORDER BY id DESC', [userId]);
 //     res.status(200).json({ success: true, data: allContacts });
 //   } catch (err) {
 //     res.status(500).json({ success: false, message: "Failed to delete contact" });
@@ -227,7 +245,7 @@
 //       res.status(200).json({ latitude: 23.8103, longitude: 90.4125, area: "Mirpur, Dhaka", updatedAt: "Just now" });
 //     }
 //   } catch (err) {
-//     console.error("❌ Database Error (Fetch Location):", err.message);
+//     console.error("Database Error (Fetch Location):", err.message);
 //     res.status(500).json({ success: false, message: "Database Sync Error" });
 //   }
 // });
@@ -253,22 +271,21 @@
 // });
 
 // // ==========================================
-// // 🚨 REAL-TIME SOS EMAIL BROADCAST ENDPOINT
+// // 🚨 REAL-TIME SOS EMAIL BROADCAST ENDPOINT (🔒 SECURED)
 // // ==========================================
 // app.post('/api/sos/trigger', async (req, res) => {
-//   const { latitude, longitude, area } = req.body;
-//   if (!latitude || !longitude) {
-//     return res.status(400).json({ success: false, message: "Missing coordinates!" });
+//   const { userId, latitude, longitude, area } = req.body;
+//   if (!userId || !latitude || !longitude) {
+//     return res.status(400).json({ success: false, message: "Missing required SOS fields!" });
 //   }
 
-//   // 🛠️ ম্যাপের লিংক জেনারেশন পারফেক্ট গুগল ম্যাপস স্ট্যান্ডার্ডে ফিক্স করা হলো 🚀
 //   const googleMapLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
 //   const currentArea = area || "Unknown Location";
 
 //   try {
-//     const [contacts] = await db.query('SELECT email FROM contacts WHERE email IS NOT NULL AND email != ""');
+//     const [contacts] = await db.query('SELECT email FROM contacts WHERE user_id = ? AND email IS NOT NULL AND email != ""', [userId]);
 //     if (contacts.length === 0) {
-//       return res.status(400).json({ success: false, message: "No emergency contacts found!" });
+//       return res.status(400).json({ success: false, message: "No emergency contacts found for this account!" });
 //     }
 
 //     const emailList = contacts.map(c => c.email).join(', ');
@@ -281,7 +298,7 @@
 //     });
 
 //     const mailOptions = {
-//       from: `"🛡️ RescueHer Emergency Alert" <${process.env.EMAIL_USER}>`, 
+//       from: `"RescueHer Emergency Alert" <${process.env.EMAIL_USER}>`, 
 //       to: emailList, 
 //       subject: '🚨 EMERGENCY ALERT: NEED HELP!',
 //       html: `
@@ -299,18 +316,17 @@
 //     await transporter.sendMail(mailOptions);
 //     res.status(200).json({ success: true, message: "SOS Activated! Emails sent." });
 //   } catch (err) {
-//     console.error("❌ Mail Error:", err);
+//     console.error("Mail Error:", err);
 //     res.status(500).json({ success: false, message: "Failed to broadcast SOS emails." });
 //   }
 // });
 
 // app.listen(PORT, () => {
-//   console.log(`🚀 Node & MySQL System Active -> Running on HTTP port: ${PORT}`);
+//   console.log(`Node & MySQL System Active -> Running on HTTP port: ${PORT}`);
 // });
 
-
 // server.js
-require('dotenv').config(); // 👈 এটি .env ফাইল থেকে সব সিক্রেট লোড করবে
+require('dotenv').config(); 
 
 const express = require('express');
 const cors = require('cors');
@@ -318,6 +334,7 @@ const mysql = require('mysql2');
 const bcrypt = require('bcryptjs'); 
 const jwt = require('jsonwebtoken'); 
 const nodemailer = require('nodemailer'); 
+const fs = require('fs'); 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -326,19 +343,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'rescueher_super_secret_matrix_key_
 app.use(cors());
 app.use(express.json());
 
-// 🛢️ MySQL Database Connection Pool
+// 🛢️ MySQL Database Connection Pool (Aiven Cloud Secure Connection Matrix ☁️)
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD, 
+  password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT || 22842,
-  ssl: {
-    rejectUnauthorized: false 
-  },
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  ssl: {
+    rejectUnauthorized: false
+  }
 }).promise();
 
 // ==========================================
@@ -346,15 +363,15 @@ const db = mysql.createPool({
 // ==========================================
 async function initializeDatabase() {
   try {
-    console.log("⏳ Checking & Preparing Online Database Tables...");
+    console.log("⏳ Checking & Preparing Local Database Tables...");
 
-    // ১. Users Table
+    // ১. Users Table 
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         phone VARCHAR(50) NOT NULL,
-        blood_group VARCHAR(10) NOT NULL,
+        blood_group VARCHAR(10) NULL, 
         email VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -373,7 +390,7 @@ async function initializeDatabase() {
       )
     `);
 
-    // ৩. Emergency Contacts Table
+    // ③. Emergency Contacts Table
     await db.query(`
       CREATE TABLE IF NOT EXISTS contacts (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -396,25 +413,25 @@ async function initializeDatabase() {
       )
     `);
 
-    console.log("✅ All Database Tables Verified & Ready for Action!");
+    console.log("✅ All Local Database Tables Verified & Ready for Action!");
   } catch (err) {
     console.error("❌ Database Initialization Error:", err.message);
   }
 }
 
-// ব্যাকগ্রাউন্ডে টেবিল ক্রিয়েশন রান হবে, এপিআই রিকোয়েস্ট ব্লক করবে না
+// バックグラウンドে টেবিল ক্রিয়েশন রান হবে, এপিআই রিকোয়েস্ট ব্লক করবে না
 initializeDatabase().catch(err => console.error("DB Init background error:", err));
 
 app.get('/', (req, res) => {
-  res.send('🛡️ Central Central MySQL Backend API is running smoothly...');
+  res.send('Central Central MySQL Backend API is running smoothly...');
 });
 
 // ==========================================
 // 🔐 USER AUTHENTICATION API ENDPOINTS
 // ==========================================
 app.post('/api/signup', async (req, res) => {
-  const { name, phone, bloodGroup, email, password } = req.body;
-  if (!name || !phone || !bloodGroup || !email || !password) {
+  const { name, phone, email, password } = req.body;
+  if (!name || !phone || !email || !password) {
     return res.status(400).json({ success: false, message: "All fields are required!" });
   }
   try {
@@ -424,9 +441,10 @@ app.post('/api/signup', async (req, res) => {
     }
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+    
     const [result] = await db.query(
-      'INSERT INTO users (name, phone, blood_group, email, password) VALUES (?, ?, ?, ?, ?)',
-      [name, phone, bloodGroup, email, hashedPassword]
+      'INSERT INTO users (name, phone, email, password, blood_group) VALUES (?, ?, ?, ?, NULL)',
+      [name, phone, email, hashedPassword]
     );
     const userId = result.insertId;
     const token = jwt.sign({ id: userId, email: email }, JWT_SECRET, { expiresIn: '7d' });
@@ -553,7 +571,7 @@ app.get('/api/location', async (req, res) => {
       res.status(200).json({ latitude: 23.8103, longitude: 90.4125, area: "Mirpur, Dhaka", updatedAt: "Just now" });
     }
   } catch (err) {
-    console.error("❌ Database Error (Fetch Location):", err.message);
+    console.error("Database Error (Fetch Location):", err.message);
     res.status(500).json({ success: false, message: "Database Sync Error" });
   }
 });
@@ -606,7 +624,7 @@ app.post('/api/sos/trigger', async (req, res) => {
     });
 
     const mailOptions = {
-      from: `"🛡️ RescueHer Emergency Alert" <${process.env.EMAIL_USER}>`, 
+      from: `"RescueHer Emergency Alert" <${process.env.EMAIL_USER}>`, 
       to: emailList, 
       subject: '🚨 EMERGENCY ALERT: NEED HELP!',
       html: `
@@ -624,11 +642,11 @@ app.post('/api/sos/trigger', async (req, res) => {
     await transporter.sendMail(mailOptions);
     res.status(200).json({ success: true, message: "SOS Activated! Emails sent." });
   } catch (err) {
-    console.error("❌ Mail Error:", err);
+    console.error("Mail Error:", err);
     res.status(500).json({ success: false, message: "Failed to broadcast SOS emails." });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Node & MySQL System Active -> Running on HTTP port: ${PORT}`);
+  console.log(`Node & MySQL System Active -> Running on HTTP port: ${PORT}`);
 });
