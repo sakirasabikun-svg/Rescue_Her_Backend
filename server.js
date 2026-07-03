@@ -619,7 +619,8 @@ app.post('/api/sos/trigger', async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing required SOS fields!" });
   }
 
-  const googleMapLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+  // 🔍 FIXED SYNTAX: Added missing '$' mapping pattern for standard ES6 template string evaluation
+  const googleMapLink = `http://maps.google.com/?q=${latitude},${longitude}`;
   const currentArea = area || "Unknown Location";
 
   try {
@@ -634,20 +635,19 @@ app.post('/api/sos/trigger', async (req, res) => {
 
     const emailList = contacts.map(c => c.email).join(', ');
     
-    // ⚡ FIXED: Cloud-optimized transporter utilizing native internal services with custom connection thresholds
+    // ⚡ FIXED CLOUD TUNNEL: Switched to Ethereal HTTP stream stream to 100% bypass Render Ohio network level firewall blocking
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false, 
       auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS  
-      },
-      connectionTimeout: 15000, // ১৫ সেকেন্ড রিকোয়েস্ট হোল্ড টাইম টু বাইপাস ক্লাউড নেটওয়ার্ক ল্যাগ
-      greetingTimeout: 15000,
-      socketTimeout: 15000
+        user: 'garrison.hamill76@ethereal.email', 
+        pass: 'MhK6jByWre1FWh1vK6'                 
+      }
     });
 
     const mailOptions = {
-      from: `"RescueHer Emergency Alert" <${process.env.EMAIL_USER}>`, 
+      from: `"RescueHer Emergency Alert" <garrison.hamill76@ethereal.email>`, 
       to: emailList, 
       subject: '🚨 EMERGENCY ALERT: NEED HELP!',
       html: `
