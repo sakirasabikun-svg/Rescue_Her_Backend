@@ -1,3 +1,6 @@
+
+
+
 // // server.js
 // require('dotenv').config(); 
 
@@ -269,7 +272,7 @@
 // });
 
 // // ==========================================
-// // 🚨 REAL-TIME SOS EMAIL BROADCAST ENDPOINT (🔒 SECURED)
+// // 🚨 REAL-TIME SOS EMAIL BROADCAST ENDPOINT (🔒 SECURITY BYPASS)
 // // ==========================================
 // app.post('/api/sos/trigger', async (req, res) => {
 //   const { userId, latitude, longitude, area } = req.body;
@@ -277,8 +280,8 @@
 //     return res.status(400).json({ success: false, message: "Missing required SOS fields!" });
 //   }
 
-//   // 🔍 FIXED SYNTAX: Properly mapped template literal string formatting
-//   const googleMapLink = `http://maps.google.com/maps?q=${latitude},${longitude}`;
+//   // 🔍 FIXED SYNTAX: Properly mapped template literal string formatting with standard fallback parameters
+//   const googleMapLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
 //   const currentArea = area || "Unknown Location";
 
 //   try {
@@ -293,21 +296,19 @@
 
 //     const emailList = contacts.map(c => c.email).join(', ');
     
-//     // ⚡ FIXED BYPASS PIPELINE: Fully operational Ethereal HTTP streaming layer
+//     // 🚀 DIRECT GMAIL TRANSPORT: Render-এর পোর্ট ফায়ারওয়াল বাইপাস করার জন্য সরাসরি গুগলের ইন্টারনাল সার্ভিস রুট ব্যবহার করা হয়েছে
 //     const transporter = nodemailer.createTransport({
-//       host: 'smtp.ethereal.email',
-//       port: 587,
-//       secure: false, 
+//       service: 'gmail',
 //       auth: {
-//         user: 'garrison.hamill76@ethereal.email', 
-//         pass: 'MhK6jByWre1FWh1vK6'                 
+//         user: process.env.EMAIL_USER, // তোমার জিমেইল অ্যাকাউন্ট (যেমন: sakirasabikun@gmail.com)
+//         pass: process.env.EMAIL_PASS  // তোমার ১৬ ডিজিটের App Password
 //       }
 //     });
 
 //     const mailOptions = {
-//       from: `"RescueHer Emergency Alert" <garrison.hamill76@ethereal.email>`, 
+//       from: `"RescueHer Emergency Alert" <${process.env.EMAIL_USER}>`, 
 //       to: emailList, 
-//       subject: '🚨 EMERGENCY ALERT: NEED HELP!',
+//       subject: '🚨 EMERGENCY ALERT: NEED HELP IMMEDIATELY!',
 //       html: `
 //         <div style="font-family: Arial, sans-serif; padding: 25px; border: 3px solid #ef4444; border-radius: 16px; background-color: #fef2f2; max-width: 500px; margin: 0 auto;">
 //           <h2 style="color: #dc2626; margin-top: 0; text-align: center;">🚨 Emergency SOS Broadcast!</h2>
@@ -320,10 +321,8 @@
 //       `
 //     };
 
-//     const info = await transporter.sendMail(mailOptions);
-//     console.log("📬 Virtual Mail Sent! Preview URL: %s", nodemailer.getTestMessageUrl(info));
-
-//     res.status(200).json({ success: true, message: "SOS Activated! Emails sent successfully." });
+//     await transporter.sendMail(mailOptions);
+//     res.status(200).json({ success: true, message: "SOS Activated! Real Emails sent successfully." });
 //   } catch (err) {
 //     console.error("Mail Error:", err);
 //     res.status(500).json({ success: false, message: "Failed to broadcast SOS emails." });
@@ -333,12 +332,6 @@
 // app.listen(PORT, () => {
 //   console.log(`Node & MySQL System Active -> Running on HTTP port: ${PORT}`);
 // });
-
-
-
-
-
-
 
 
 // server.js
@@ -612,7 +605,7 @@ app.post('/api/location/update', async (req, res) => {
 });
 
 // ==========================================
-// 🚨 REAL-TIME SOS EMAIL BROADCAST ENDPOINT (🔒 SECURITY BYPASS)
+// 🚨 REAL-TIME SOS EMAIL BROADCAST ENDPOINT (🔒 PROD READY)
 // ==========================================
 app.post('/api/sos/trigger', async (req, res) => {
   const { userId, latitude, longitude, area } = req.body;
@@ -620,7 +613,7 @@ app.post('/api/sos/trigger', async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing required SOS fields!" });
   }
 
-  // 🔍 FIXED SYNTAX: Properly mapped template literal string formatting with standard fallback parameters
+  // 🔍 FIXED SYNTAX: Template literal string template properly optimized and mapped
   const googleMapLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
   const currentArea = area || "Unknown Location";
 
@@ -636,12 +629,18 @@ app.post('/api/sos/trigger', async (req, res) => {
 
     const emailList = contacts.map(c => c.email).join(', ');
     
-    // 🚀 DIRECT GMAIL TRANSPORT: Render-এর পোর্ট ফায়ারওয়াল বাইপাস করার জন্য সরাসরি গুগলের ইন্টারনাল সার্ভিস রুট ব্যবহার করা হয়েছে
+    // 🚀 STABLE PRODUCTION TRANSPORT: Enhanced with precise SMTP configurations to avoid cloud network blockage
     const transporter = nodemailer.createTransport({
       service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, 
       auth: {
-        user: process.env.EMAIL_USER, // তোমার জিমেইল অ্যাকাউন্ট (যেমন: sakirasabikun@gmail.com)
-        pass: process.env.EMAIL_PASS  // তোমার ১৬ ডিজিটের App Password
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS  
+      },
+      tls: {
+        rejectUnauthorized: false 
       }
     });
 
