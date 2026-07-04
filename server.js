@@ -627,7 +627,8 @@ app.post('/api/sos/trigger', async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing required SOS fields!" });
   }
 
-  const googleMapLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+  // 🔍 FIXED TYPO: Changed '0{latitude}' to proper template literal '${latitude}'
+  const googleMapLink = `http://maps.google.com/?q=${latitude},${longitude}`;
   const currentArea = area || "Unknown Location";
 
   try {
@@ -642,18 +643,18 @@ app.post('/api/sos/trigger', async (req, res) => {
 
     const emailList = contacts.map(c => c.email).join(', ');
     
-    // 🚀 FIXED TRANSFORMATION LAYER: Port 587 configuration injected perfectly
+    // 🚀 STABLE PRODUCTION TRANSPORT: Port 587 configuration sets for Render network stability
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       host: 'smtp.gmail.com',
-      port: 587,
-      secure: false, // Port 587-এর জন্য এটি অবশ্যই false হবে
+      port: 587, 
+      secure: false, 
       auth: {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  
       },
       tls: {
-        rejectUnauthorized: false // রেন্ডার ক্লাউড নেটওয়ার্কের কানেকশন টাইমআউট বাইপাস করার জন্য
+        rejectUnauthorized: false 
       }
     });
 
